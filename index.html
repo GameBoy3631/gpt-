@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>GPT</title>
+<style>
+:root{
+  --bg:#1a001a;
+  --panel:#2a002a;
+  --messages-bg:#2a002a;
+  --accent:#ff1aff;
+  --glow:#ff4dff;
+  --text:#ffb3ff;
+  --bubble-user:#ff1aff;
+  --bubble-bot:#330033;
+  --btn-bg:#ff1aff;
+}
+html,body{height:100%;margin:0}
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--text);
+  transition:background 0.3s, color 0.3s;
+}
+
+.app{width:95%;max-width:480px;height:90vh;background:var(--panel);display:flex;flex-direction:column;border-radius:14px;overflow:hidden;box-shadow:0 0 20px var(--glow),0 0 40px rgba(255,26,255,0.25);transition:all 0.3s}
+.header{padding:16px;font-weight:600;background:transparent;border-bottom:1px solid rgba(255,77,255,0.12);text-align:center;text-shadow:0 0 8px rgba(255,77,255,0.12);font-size:1.1rem;position:relative;transition:all 0.3s}
+
+.settings-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:1.2rem;color:var(--text)}
+
+.settings-popup{position:absolute;right:10px;top:50px;background:var(--panel);padding:14px;border-radius:10px;box-shadow:0 0 12px var(--glow);display:none;flex-direction:column;gap:10px;z-index:50;transition:all 0.3s}
+.settings-popup label{display:flex;flex-direction:column;font-size:0.95rem;color:var(--text);}
+.settings-popup select, .settings-popup input{padding:6px;margin-top:4px;border-radius:6px;border:1px solid var(--accent);background:var(--panel);color:white}
+
+.messages{flex:1;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:10px;background:var(--messages-bg);transition:all 0.3s}
+
+.bubble{padding:10px 14px;border-radius:14px;max-width:80%;word-wrap:break-word;transition:all 0.3s}
+.user{margin-left:auto;border-bottom-right-radius:6px}
+.bot{margin-right:auto;border-bottom-left-radius:6px}
+
+.error-bubble{ /* wie normale Bubble, aber rot */
+  background:#ff4d4d;
+  color:white;
+  border-radius:14px;
+  padding:10px 14px;
+  max-width:80%;
+  word-wrap:break-word;
+  box-shadow:0 0 8px rgba(255,77,77,0.4);
+}
+
+.composer{display:flex;padding:10px;border-top:1px solid rgba(255,77,255,0.08);background:var(--panel);gap:8px;align-items:center;position:relative;transition:all 0.3s}
+.input{flex:1;padding:10px 12px;border-radius:10px;background:var(--panel);color:var(--text);font-size:1rem;padding-left:44px;border:1px solid var(--accent);transition:all 0.3s}
+
+.file-label{position:absolute;left:12px;top:50%;transform:translateY(-50%);cursor:pointer;user-select:none;transition:all 0.3s}
+.file-label span{display:flex;justify-content:center;align-items:center;width:24px;height:24px;border:2px solid var(--accent);border-radius:50%;color:var(--accent);font-weight:bold;font-size:1.1rem;box-shadow:0 0 6px var(--glow);transition:all 0.3s}
+.file-label input{display:none}
+
+.btn{padding:10px 14px;border-radius:10px;cursor:pointer;font-size:1rem;border:none;transition:all 0.3s;background:var(--btn-bg);color:white;box-shadow:0 0 10px var(--glow)}
+
+.preview-img{max-width:160px;border-radius:8px;box-shadow:0 0 10px rgba(255,77,255,0.18);display:block;transition:all 0.3s}
+.file-meta{font-size:0.9rem;color:#ffd6ff;transition:all 0.3s}
+
+@media (max-width:420px){
+  .app{height:94vh}
+  .input{font-size:0.95rem;padding-left:42px}
+  .header{font-size:1rem}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    GPT
+    <div id="settingsBtn" class="settings-btn" title="Einstellungen">⚙</div>
+    <div id="settingsPopup" class="settings-popup">
+      <label>API Key:<br>
+        <input id="apiKey" type="password" placeholder="********" />
+      </label>
+      <label>Farbe:<br>
+        <select id="themeColor">
+          <option value="#1a001a" data-user="#ff1aff" data-bot="#330033" data-btn="#ff1aff">NeonPink</option>
+          <option value="#001a1a" data-user="#00ffff" data-bot="#003333" data-btn="#00ffff">NeonCyan</option>
+          <option value="#1a1a00" data-user="#ffff00" data-bot="#333300" data-btn="#ffff00">NeonYellow</option>
+          <option value="#000000" data-user="#555" data-bot="#111" data-btn="#555">Schwarz</option>
+        </select>
+      </label>
+      <label>Style:<br>
+        <select id="themeStyle">
+          <option value="neon">Neon</option>
+          <option value="schlicht">Schlicht</option>
+          <option value="pastell">Pastell [BETA]</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div id="messages" class="messages" aria-live="polite"></div>
+
+  <div class="composer">
+    <label class="file-label" title="Datei anhängen">
+      <span>+</span>
+      <input id="fileInput" type="file" accept="*/*" />
+    </label>
+    <input id="input" class="input" placeholder="Nachricht..." aria-label="Nachricht eingeben">
+    <button id="sendBtn" class="btn">Senden</button>
+  </div>
+</div>
+
+<script>
+(function(){
+const msg = document.getElementById('messages');
+const inp = document.getElementById('input');
+const send = document.getElementById('sendBtn');
+const fileInput = document.getElementById('fileInput');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPopup = document.getElementById('settingsPopup');
+const themeColor = document.getElementById('themeColor');
+const themeStyle = document.getElementById('themeStyle');
+
+settingsBtn.addEventListener('click',()=>{
+  settingsPopup.style.display = settingsPopup.style.display === 'flex' ? 'none' : 'flex';
+});
+
+function applyTheme(){
+  let style = themeStyle.value;
+  let selected = themeColor.selectedOptions[0];
+
+  let panelColor = selected.value;
+  let userColor = selected.dataset.user;
+  let botColor = selected.dataset.bot;
+  let btnColor = selected.dataset.btn;
+
+  document.documentElement.style.setProperty('--bg', panelColor);
+  document.documentElement.style.setProperty('--panel', panelColor);
+  document.documentElement.style.setProperty('--bubble-user', userColor);
+  document.documentElement.style.setProperty('--bubble-bot', botColor);
+  document.documentElement.style.setProperty('--btn-bg', btnColor);
+
+  let messagesBg = panelColor;
+  if(style==='schlicht'){
+    messagesBg = lightenDarkenColor(panelColor, -20);
+  }
+  document.documentElement.style.setProperty('--messages-bg', messagesBg);
+
+  if(style==='neon'){
+    document.documentElement.style.setProperty('--accent', btnColor);
+    document.documentElement.style.setProperty('--glow', btnColor);
+    document.documentElement.style.setProperty('--text', '#fff');
+    document.querySelector('.app').style.boxShadow=`0 0 20px ${btnColor},0 0 40px ${btnColor}`;
+    settingsPopup.style.boxShadow=`0 0 12px ${btnColor}`;
+  } else if(style==='schlicht'){
+    document.documentElement.style.setProperty('--accent','#ccc');
+    document.documentElement.style.setProperty('--glow','#000');
+    document.documentElement.style.setProperty('--text','#ddd');
+    document.querySelector('.app').style.boxShadow='none';
+    settingsPopup.style.boxShadow='none';
+  } else if(style==='pastell'){
+    document.documentElement.style.setProperty('--accent','#f99');
+    document.documentElement.style.setProperty('--glow','#000');
+    document.documentElement.style.setProperty('--text','#222');
+    document.querySelector('.app').style.boxShadow='none';
+    settingsPopup.style.boxShadow='none';
+  }
+
+  function getContrastColor(hex){
+    let r = parseInt(hex.substr(1,2),16);
+    let g = parseInt(hex.substr(3,2),16);
+    let b = parseInt(hex.substr(5,2),16);
+    let brightness = (r*299 + g*587 + b*114)/1000;
+    return brightness > 150 ? '#000' : '#fff';
+  }
+  send.style.background = btnColor;
+  send.style.color = getContrastColor(btnColor);
+}
+
+function lightenDarkenColor(col, amt) {
+  let usePound = false;
+  if(col[0] === "#"){col=col.slice(1); usePound=true;}
+  let num = parseInt(col,16);
+  let r = (num >> 16)+amt;
+  let g = ((num >> 8)&0x00FF)+amt;
+  let b = (num & 0x0000FF)+amt;
+  r=Math.max(Math.min(255,r),0);
+  g=Math.max(Math.min(255,g),0);
+  b=Math.max(Math.min(255,b),0);
+  return (usePound?"#":"") + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+themeColor.addEventListener('change', applyTheme);
+themeStyle.addEventListener('change', applyTheme);
+
+function scrollToBottom(){ msg.scrollTop = msg.scrollHeight; }
+
+function addBubble(text, who){
+  const b = document.createElement('div');
+  b.className = 'bubble ' + who;
+  b.style.background = who==='user'? 'var(--bubble-user)': 'var(--bubble-bot)';
+  b.style.color = who==='user'? 'white': 'var(--text)';
+  b.textContent = text;
+  msg.appendChild(b);
+  scrollToBottom();
+  return b;
+}
+
+function addErrorBubble(text){
+  const b = document.createElement('div');
+  b.className = 'bubble error-bubble';
+  b.textContent = text;
+  msg.appendChild(b);
+  scrollToBottom();
+}
+
+function sendMessage(){
+  const t = inp.value.trim();
+  const apiKey = document.getElementById('apiKey').value.trim();
+
+  if(!apiKey){
+    addErrorBubble('Error: missing_api_key');
+    return;
+  }
+
+  if(!/^sk-[A-Za-z0-9]{48}$/.test(apiKey)){
+    addErrorBubble('Error: failed_to_request');
+    return;
+  }
+
+  if(!t) return;
+  addBubble(t,'user');
+
+  // Simuliert API-Fehler
+  if(t.toLowerCase().includes("error")){
+    addErrorBubble("internal.error: Etwas ist schiefgelaufen!");
+  } else {
+    addBubble('Computer says NO!', 'bot');
+  }
+
+  inp.value='';
+}
+
+send.addEventListener('click', sendMessage);
+inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); sendMessage(); } });
+
+fileInput.addEventListener('change', ()=>{
+  const file = fileInput.files && fileInput.files[0];
+  if(!file) return;
+
+  const container = document.createElement('div');
+  container.className = 'bubble user';
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.style.gap = '8px';
+
+  const meta = document.createElement('div');
+  meta.className = 'file-meta';
+  meta.textContent = `Datei: ${file.name} (${Math.round(file.size/1024)} KB)`;
+  container.appendChild(meta);
+
+  if(file.type && file.type.startsWith('image/')){
+    const img = document.createElement('img');
+    img.className = 'preview-img';
+    img.alt = file.name;
+    img.src = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(img.src); };
+    container.appendChild(img);
+  }
+
+  msg.appendChild(container);
+  scrollToBottom();
+  fileInput.value = '';
+});
+
+applyTheme();
+})();
+</script>
+</body>
+</html>
